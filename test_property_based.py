@@ -156,3 +156,160 @@ def test_weight_scaling(G, factor):
         pass
 
 
+# ========================
+# MST Tests
+# ========================
+
+@given(weighted_graphs())
+def test_mst_edge_count(G):
+    """
+    Property: MST Edge Count
+
+    A spanning tree must have at most (n - 1) edges.
+
+    Importance:
+    Ensures tree structure (no cycles).
+
+    Failure Meaning:
+    Indicates cycles or incorrect MST construction.
+    """
+    if len(G.nodes()) == 0:
+        return
+
+    T = nx.minimum_spanning_tree(G)
+
+    assert len(T.edges()) <= len(G.nodes()) - 1
+
+
+@given(weighted_graphs())
+def test_mst_is_forest(G):
+    """
+    Property: Acyclic Structure
+
+    MST must not contain cycles.
+
+    Importance:
+    Fundamental property of trees.
+
+    Failure Meaning:
+    Indicates incorrect edge selection.
+    """
+    T = nx.minimum_spanning_tree(G)
+    assert nx.is_forest(T)
+
+
+@given(weighted_graphs(), st.integers(min_value=1, max_value=10))
+def test_mst_weight_shift(G, c):
+    """
+    Property: Weight Shift Invariance
+
+    Adding constant to all weights should not change MST structure.
+
+    Importance:
+    MST depends only on relative ordering.
+
+    Failure Meaning:
+    Indicates algorithm incorrectly depends on absolute weights.
+    """
+    if len(G.edges()) == 0:
+        return
+
+    T1 = nx.minimum_spanning_tree(G)
+
+    G2 = G.copy()
+    for u, v in G2.edges():
+        G2[u][v]['weight'] += c
+
+    T2 = nx.minimum_spanning_tree(G2)
+
+    assert set(T1.edges()) == set(T2.edges())
+
+
+# ========================
+# Connected Components Tests
+# ========================
+
+@given(undirected_graphs())
+def test_components_cover_all_nodes(G):
+    """
+    Property: Partition Coverage
+
+    All nodes must appear in exactly one connected component.
+
+    Importance:
+    Ensures correctness of component detection.
+
+    Failure Meaning:
+    Missing or duplicated nodes in components.
+    """
+    comps = list(nx.connected_components(G))
+    union = set().union(*comps) if comps else set()
+
+    assert union == set(G.nodes())
+
+
+@given(undirected_graphs())
+def test_components_disjoint(G):
+    """
+    Property: Disjoint Components
+
+    Connected components must be pairwise disjoint.
+
+    Importance:
+    Defines valid partition.
+
+    Failure Meaning:
+    Overlapping components indicate incorrect grouping.
+    """
+    comps = list(nx.connected_components(G))
+
+    for i in range(len(comps)):
+        for j in range(i+1, len(comps)):
+            assert comps[i].isdisjoint(comps[j])
+
+
+@given(undirected_graphs())
+def test_adding_edge_reduces_components(G):
+    """
+    Property: Edge Addition (Metamorphic)
+
+    Adding an edge cannot increase number of components.
+
+    Importance:
+    Connectivity is monotonic under edge addition.
+
+    Failure Meaning:
+    Indicates incorrect connectivity computation.
+    """
+    nodes = list(G.nodes())
+    if len(nodes) < 2:
+        return
+
+    before = nx.number_connected_components(G)
+
+    G.add_edge(nodes[0], nodes[-1])
+
+    after = nx.number_connected_components(G)
+
+    assert after <= before
+
+
+# ========================
+# Boundary Tests
+# ========================
+
+def test_empty_graph():
+    """
+    Property: Empty Graph Behavior
+
+    Ensures algorithms handle empty graphs correctly.
+
+    Importance:
+    Edge-case robustness.
+
+    Failure Meaning:
+    Algorithm does not handle base cases properly.
+    """
+    G = nx.Graph()
+
+    assert list(nx.connected_components(G)) == []
