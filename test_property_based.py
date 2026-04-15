@@ -14,7 +14,8 @@ Algorithms Tested:
 
 Description:
 This file contains property-based tests using Hypothesis to validate
-core properties of graph algorithms implemented in NetworkX.
+core invariants, postconditions, metamorphic properties, idempotence,
+and boundary conditions of graph algorithms implemented in NetworkX.
 """
 
 # ========================
@@ -45,6 +46,7 @@ def weighted_graphs(draw):
         G[u][v]['weight'] = draw(st.integers(min_value=1, max_value=10))
 
     return G
+
 
 # ========================
 # Shortest Path Tests
@@ -83,6 +85,74 @@ def test_triangle_inequality(G):
         d_xv = nx.dijkstra_path_length(G, x, v)
 
         assert d_uv <= d_ux + d_xv
+    except nx.NetworkXNoPath:
+        pass
+
+
+@given(weighted_graphs())
+def test_shortest_path_validity(G):
+    """
+    Property: Path Validity
+
+    Ensures that the computed shortest path:
+    - Starts at source
+    - Ends at destination
+    - Uses valid edges
+
+    Importance:
+    Guarantees correctness of returned path structure.
+
+    Failure Meaning:
+    Indicates invalid path construction.
+    """
+    nodes = list(G.nodes())
+    if len(nodes) < 2:
+        return
+
+    u, v = nodes[0], nodes[-1]
+
+    try:
+        path = nx.dijkstra_path(G, u, v)
+
+        assert path[0] == u
+        assert path[-1] == v
+
+        for i in range(len(path)-1):
+            assert G.has_edge(path[i], path[i+1])
+    except nx.NetworkXNoPath:
+        pass
+
+
+@given(weighted_graphs(), st.integers(min_value=1, max_value=5))
+def test_weight_scaling(G, factor):
+    """
+    Property: Weight Scaling (Metamorphic)
+
+    Scaling all edge weights by a factor should scale shortest path
+    distance by the same factor.
+
+    Importance:
+    Validates correctness under transformation of weights.
+
+    Failure Meaning:
+    Indicates incorrect handling of weights.
+    """
+    nodes = list(G.nodes())
+    if len(nodes) < 2:
+        return
+
+    u, v = nodes[0], nodes[-1]
+
+    try:
+        d1 = nx.dijkstra_path_length(G, u, v)
+
+        G2 = G.copy()
+        for a, b in G2.edges():
+            G2[a][b]['weight'] *= factor
+
+        d2 = nx.dijkstra_path_length(G2, u, v)
+
+        assert d2 == d1 * factor
     except nx.NetworkXNoPath:
         pass
 
