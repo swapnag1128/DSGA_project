@@ -1,4 +1,3 @@
-%%writefile test_property_based.py
 """
 ===========================================
 Property-Based Testing for Graph Algorithms
